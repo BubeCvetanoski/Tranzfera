@@ -40,6 +40,8 @@ class MainActivity : ComponentActivity() {
             ActivityResultContracts.RequestMultiplePermissions()
         ) {}
 
+        //Log.i("TEST", "TEST")
+
         bluetoothHandler = BluetoothHandler(
             context = this,
             intentLauncher = requestBluetoothEnableLauncher,
