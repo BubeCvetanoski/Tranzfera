@@ -2,11 +2,15 @@ package com.example.tranzfera.util
 
 import android.Manifest
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Bitmap.CompressFormat
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.Build.VERSION.SDK_INT
 import android.os.Bundle
 import android.os.Parcelable
 import androidx.activity.result.ActivityResultLauncher
+import java.io.ByteArrayOutputStream
 
 object HelperFunctions {
     inline fun <reified T : Parcelable> Intent.parcelable(key: String): T? = when {
@@ -25,14 +29,28 @@ object HelperFunctions {
                 arrayOf(
                     Manifest.permission.BLUETOOTH_SCAN,
                     Manifest.permission.BLUETOOTH_CONNECT,
+                    Manifest.permission.BLUETOOTH_ADVERTISE
                 )
             )
         } else {
             launch(
                 arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION
+                    Manifest.permission.BLUETOOTH_ADMIN,
+                    Manifest.permission.BLUETOOTH,
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
                 )
             )
         }
+    }
+
+    fun ByteArray.toBitmap(): Bitmap? {
+        return BitmapFactory.decodeByteArray(this, 0, this.size)
+    }
+
+    fun Bitmap.toByteArray(format: CompressFormat): ByteArray {
+        val outputStream = ByteArrayOutputStream()
+        this.compress(format, 100, outputStream)
+        return outputStream.toByteArray()
     }
 }

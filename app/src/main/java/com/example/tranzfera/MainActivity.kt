@@ -10,15 +10,21 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.tranzfera.navigation.Screens
-import com.example.tranzfera.navigation.composable.TranzferaNavigationBar
-import com.example.tranzfera.screen.ConnectScreen
-import com.example.tranzfera.screen.TransferScreen
+import com.example.tranzfera.data.bluetooth.BluetoothHandler
+import com.example.tranzfera.presentation.event.UiAction
+import com.example.tranzfera.presentation.navigation.Screens
+import com.example.tranzfera.presentation.navigation.composable.TranzferaNavigationBar
+import com.example.tranzfera.presentation.screen.ConnectScreen
+import com.example.tranzfera.presentation.screen.TransferScreen
+
+typealias OnAction = (UiAction) -> Unit
 
 class MainActivity : ComponentActivity() {
 
@@ -29,6 +35,7 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels {
         MainViewModel.Factory(bluetoothHandler)
     }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -40,17 +47,24 @@ class MainActivity : ComponentActivity() {
             ActivityResultContracts.RequestMultiplePermissions()
         ) {}
 
-        //Log.i("TEST", "TEST")
-
         bluetoothHandler = BluetoothHandler(
-            context = this,
+            context = applicationContext,
             intentLauncher = requestBluetoothEnableLauncher,
             permissionLauncher = requestBluetoothPermissionLauncher
         )
 
         setContent {
             val navController = rememberNavController()
-            val state = viewModel.state.collectAsState().value
+            val connectState by viewModel.connectState.collectAsStateWithLifecycle()
+            val transferState by viewModel.transferState.collectAsStateWithLifecycle()
+
+            LaunchedEffect(Unit) {
+                viewModel.onAction(UiAction.StartBluetoothServer)
+            }
+
+            LaunchedEffect(!connectState.isConnectedDevice) {
+                viewModel.onAction(UiAction.ResetTransferedData)
+            }
 
             Scaffold(
                 modifier = Modifier
@@ -68,35 +82,18 @@ class MainActivity : ComponentActivity() {
                 ) {
                     composable(route = Screens.ConnectScreen.name) {
                         ConnectScreen(
-                            onBluetoothEnableClick = viewModel::onBluetoothEnableClick,
-                            isBluetoothEnabled = state.isBluetoothEnabled,
-                            onButtonScanClick = viewModel::onButtonScanClick,
-                            onButtonStopScanClick = viewModel::onButtonStopScanClick,
-                            scannedDevices = state.scannedDevices,
-                            pairedDevices = state.pairedDevices,
-                            connectedDevice = state.connectedDevice,
-                            onPairedDeviceClick = viewModel::connectToDevice,
-                            onScannedDeviceClick = viewModel::pairDevice
+                            onAction = viewModel::onAction,
+                            state = connectState
                         )
                     }
                     composable(route = Screens.TransferScreen.name) {
                         TransferScreen(
+                            onAction = viewModel::onAction,
+                            state = transferState
                         )
                     }
                 }
             }
         }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-
-        viewModel.clearBluetoothHandler()
-    }
-
-    override fun onResume() {
-        super.onResume()
-
-        viewModel.startBluetoothServer()
     }
 }
