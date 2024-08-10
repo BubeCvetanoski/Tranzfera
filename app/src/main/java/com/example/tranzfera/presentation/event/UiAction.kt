@@ -6,7 +6,7 @@ import com.example.tranzfera.data.bluetooth.FoundBluetoothDevice
 
 sealed class UiAction {
     data object OnBluetoothEnableClick : UiAction()
-    data object ResetTransferedData : UiAction()
+    data object ResetTransferredData : UiAction()
     data object StartBluetoothServer : UiAction()
     data class OnButtonScanClick(val onChangeButtonText: (String) -> Unit) : UiAction()
     data class OnButtonStopScanClick(val onChangeButtonText: (String) -> Unit) : UiAction()

@@ -56,7 +56,7 @@ class MainViewModel(
             is UiAction.OnPairedDeviceClick -> connectToDevice(event.foundBluetoothDevice)
             is UiAction.OnScannedDeviceClick -> pairDevice(event.foundBluetoothDevice)
             is UiAction.OnSendData -> sendData(event.data, event.dataType)
-            is UiAction.ResetTransferedData -> resetTransferedData()
+            is UiAction.ResetTransferredData -> resetTransferredData()
             is UiAction.StartBluetoothServer -> startBluetoothServer()
         }
     }
@@ -143,7 +143,7 @@ class MainViewModel(
         }.launchIn(viewModelScope)
     }
 
-    private fun resetTransferedData() {
+    private fun resetTransferredData() {
         _transferState.update { currentState ->
             currentState.copy(
                 data = emptyList()

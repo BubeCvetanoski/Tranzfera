@@ -63,7 +63,7 @@ class MainActivity : ComponentActivity() {
             }
 
             LaunchedEffect(!connectState.isConnectedDevice) {
-                viewModel.onAction(UiAction.ResetTransferedData)
+                viewModel.onAction(UiAction.ResetTransferredData)
             }
 
             Scaffold(

@@ -3,14 +3,12 @@ package com.example.tranzfera.util
 import android.Manifest
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.Bitmap.CompressFormat
 import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.Build.VERSION.SDK_INT
 import android.os.Bundle
 import android.os.Parcelable
 import androidx.activity.result.ActivityResultLauncher
-import java.io.ByteArrayOutputStream
 
 object HelperFunctions {
     inline fun <reified T : Parcelable> Intent.parcelable(key: String): T? = when {
@@ -46,11 +44,5 @@ object HelperFunctions {
 
     fun ByteArray.toBitmap(): Bitmap? {
         return BitmapFactory.decodeByteArray(this, 0, this.size)
-    }
-
-    fun Bitmap.toByteArray(format: CompressFormat): ByteArray {
-        val outputStream = ByteArrayOutputStream()
-        this.compress(format, 100, outputStream)
-        return outputStream.toByteArray()
     }
 }

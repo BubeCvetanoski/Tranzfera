@@ -57,53 +57,59 @@ class BluetoothHandler(
 
     private var dataTransferService: BluetoothDataTransferService? = null
 
-    private val bluetoothManager: BluetoothManager =
-        context.getSystemService(BluetoothManager::class.java)
+    private val bluetoothManager: BluetoothManager = context
+        .getSystemService(BluetoothManager::class.java)
     private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
     private val bluetoothReceiver: BroadcastReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            when (intent?.action) {
-                BluetoothAdapter.ACTION_STATE_CHANGED -> {
-                    when (intent.getIntExtra(
-                        BluetoothAdapter.EXTRA_STATE,
-                        BluetoothAdapter.ERROR
-                    )) {
-                        BluetoothAdapter.STATE_ON -> {
-                            _isBluetoothEnabled.value = true
-                        }
+        override fun onReceive(context: Context?, getIntent: Intent?) {
+            getIntent?.let { intent ->
+                when (intent.action) {
+                    BluetoothAdapter.ACTION_STATE_CHANGED -> {
+                        when (intent.getIntExtra(
+                            BluetoothAdapter.EXTRA_STATE,
+                            BluetoothAdapter.ERROR
+                        )) {
+                            BluetoothAdapter.STATE_ON -> {
+                                _isBluetoothEnabled.value = true
+                            }
 
-                        BluetoothAdapter.STATE_OFF -> {
-                            _isBluetoothEnabled.value = false
-                        }
-                    }
-                }
+                            BluetoothAdapter.STATE_OFF -> {
+                                _isBluetoothEnabled.value = false
+                            }
 
-                BluetoothDevice.ACTION_FOUND -> {
-                    val foundDevice: BluetoothDevice? =
-                        intent.parcelable(BluetoothDevice.EXTRA_DEVICE)
-
-                    foundDevice?.let {
-                        val newDevice = it.toFoundBluetoothDevice()
-
-                        _scannedDevices.update { existingDevices ->
-                            if (newDevice in existingDevices) existingDevices else existingDevices + newDevice
+                            else -> {}
                         }
                     }
-                }
 
-                BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                    val foundDevice: BluetoothDevice? =
-                        intent.parcelable(BluetoothDevice.EXTRA_DEVICE)
+                    BluetoothDevice.ACTION_FOUND -> {
+                        val foundDevice: BluetoothDevice? =
+                            intent.parcelable(BluetoothDevice.EXTRA_DEVICE)
 
-                    foundDevice?.let {
-                        val newConnectedDevice = it.toFoundBluetoothDevice()
+                        foundDevice?.let {
+                            val newDevice = it.toFoundBluetoothDevice()
 
-                        _connectedDevice.update { newConnectedDevice }
+                            _scannedDevices.update { existingDevices ->
+                                if (newDevice in existingDevices) existingDevices else existingDevices + newDevice
+                            }
+                        }
                     }
-                }
 
-                BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
-                    _connectedDevice.update { null }
+                    BluetoothDevice.ACTION_ACL_CONNECTED -> {
+                        val foundDevice: BluetoothDevice? =
+                            intent.parcelable(BluetoothDevice.EXTRA_DEVICE)
+
+                        foundDevice?.let {
+                            val newConnectedDevice = it.toFoundBluetoothDevice()
+
+                            _connectedDevice.update { newConnectedDevice }
+                        }
+                    }
+
+                    BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
+                        _connectedDevice.update { null }
+                    }
+
+                    else -> {}
                 }
             }
         }
@@ -196,7 +202,6 @@ class BluetoothHandler(
 
     suspend fun tryToSendData(data: BluetoothData, dataType: DataType): BluetoothData? {
 
-
         if (dataTransferService == null) {
             return null
         }
@@ -212,7 +217,7 @@ class BluetoothHandler(
 
             DataType.ImageType -> {
                 BluetoothData(
-                    image = data.image,
+                    imageBytes = data.imageBytes,
                     sender = bluetoothAdapter?.name ?: "Unknown name",
                     isFromMySide = data.isFromMySide
                 )
@@ -220,54 +225,13 @@ class BluetoothHandler(
         }
 
         dataTransferService?.sendData(
-            data = bluetoothData.toByteArray(),
+            data = bluetoothData.toByteArray(dataType),
             dataType = dataType
         )
 
         return bluetoothData
     }
 
-    //    fun connectToDevice(device: FoundBluetoothDevice): Flow<BluetoothState> {
-//        return flow {
-//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-//                if (!hasPermission(Manifest.permission.BLUETOOTH_CONNECT)) {
-//                    throw SecurityException("No BLUETOOTH_CONNECT permission")
-//                }
-//            }
-//            clientSocket = bluetoothAdapter
-//                ?.getRemoteDevice(device.address)
-//                ?.createRfcommSocketToServiceRecord(
-//                    UUID.fromString(UNIQUE_UUID)
-//                )
-//
-//            if (bluetoothAdapter!!.isDiscovering) {
-//                bluetoothAdapter.cancelDiscovery()
-//            }
-//
-//            clientSocket?.let { currentClientSocket ->
-//                try {
-//                    currentClientSocket.connect()
-//                    emit(BluetoothState.BluetoothConnectionSuccess)
-//
-//                    BluetoothDataTransferService(socket = currentClientSocket).also { service ->
-//                        dataTransferService = service
-//                        emitAll(
-//                            service
-//                                .listenForIncomingData()
-//                                .map { data ->
-//                                    BluetoothState.BluetoothDataTransferSuccess(data)
-//                                }
-//                        )
-//                    }
-//
-//                } catch (e: IOException) {
-//                    currentClientSocket.close()
-//                    clientSocket = null
-//                    emit(BluetoothState.BluetoothConnectionError("Connection is not successful, try again!"))
-//                }
-//            }
-//        }.flowOn(Dispatchers.IO)
-//    }
     fun connectToDevice(device: FoundBluetoothDevice): Flow<BluetoothState> {
         return flow {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
