@@ -1,4 +1,4 @@
-package com.example.tranzfera.data.bluetooth
+package com.example.tranzfera.data.bluetooth.model
 
 enum class DataType(val value: Byte) {
     StringType(0x01),

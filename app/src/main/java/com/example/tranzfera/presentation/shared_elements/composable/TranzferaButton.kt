@@ -1,4 +1,4 @@
-package com.example.tranzfera.ui.composable
+package com.example.tranzfera.presentation.shared_elements.composable
 
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button

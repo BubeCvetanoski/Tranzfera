@@ -1,9 +1,9 @@
 package com.example.tranzfera.presentation.screen
 
+import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,19 +13,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ImageSearch
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -36,21 +40,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Color.Companion.White
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import com.example.tranzfera.OnAction
-import com.example.tranzfera.data.bluetooth.BluetoothData
-import com.example.tranzfera.data.bluetooth.DataType
+import com.example.tranzfera.data.bluetooth.model.BluetoothData
+import com.example.tranzfera.data.bluetooth.model.DataType
 import com.example.tranzfera.presentation.event.UiAction
 import com.example.tranzfera.presentation.state.TransferState
-import com.example.tranzfera.ui.composable.BlurredBackground
+import com.example.tranzfera.presentation.shared_elements.composable.BlurredBackground
+import com.example.tranzfera.presentation.shared_elements.theme.Gray80
+import com.example.tranzfera.util.HelperFunctions.saveMediaToStorage
 import com.example.tranzfera.util.HelperFunctions.toBitmap
 
-//todo once the connection is done, the messages chat should be reset
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun TransferScreen(
@@ -58,8 +63,8 @@ fun TransferScreen(
     state: TransferState
 ) {
     val context = LocalContext.current
-    val message = rememberSaveable { mutableStateOf("") }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val message = rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
     val imageLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
@@ -68,9 +73,8 @@ fun TransferScreen(
             val imageBytes = context
                 .contentResolver
                 .openInputStream(it)
-                ?.use { inputStream ->
-                    inputStream.readBytes()
-                } ?: byteArrayOf()
+                ?.use { inputStream -> inputStream.readBytes() }
+                ?: byteArrayOf()
 
             onAction(
                 UiAction.OnSendData(
@@ -91,7 +95,7 @@ fun TransferScreen(
 
         Column(modifier = Modifier.fillMaxSize()) {
             Text(
-                text = "Messages",
+                text = "Chat",
                 color = White,
                 modifier = Modifier
                     .padding(16.dp)
@@ -124,7 +128,9 @@ fun TransferScreen(
                                 modifier = Modifier.align(
                                     if (data.isFromMySide) Alignment.End
                                     else Alignment.Start
-                                )
+                                ),
+                                context = context,
+                                onAction = onAction
                             )
                         }
                     }
@@ -143,7 +149,11 @@ fun TransferScreen(
                     modifier = Modifier.weight(1f),
                     placeholder = {
                         Text(text = "Message")
-                    }
+                    },
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = Gray80,
+                        cursorColor = Gray80,
+                    )
                 )
                 IconButton(
                     onClick = {
@@ -187,20 +197,25 @@ fun TransferScreen(
 
 @Composable
 fun ChatMessage(
+    context: Context,
     data: BluetoothData,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onAction: OnAction
 ) {
+    val isDataFromMySide = data.isFromMySide
+    val color = if (isDataFromMySide) Gray80 else White
+
     Column(
         modifier = modifier
             .clip(
                 RoundedCornerShape(
-                    topStart = if (data.isFromMySide) 15.dp else 0.dp,
+                    topStart = if (isDataFromMySide) 15.dp else 0.dp,
                     topEnd = 15.dp,
                     bottomStart = 15.dp,
-                    bottomEnd = if (data.isFromMySide) 0.dp else 15.dp
+                    bottomEnd = if (isDataFromMySide) 0.dp else 15.dp
                 )
             )
-            .background(Color(0xFFcd8b76))
+            .background(color)
             .padding(16.dp)
     ) {
         Text(
@@ -215,31 +230,61 @@ fun ChatMessage(
                 modifier = Modifier.widthIn(max = 250.dp)
             )
         }
-        data.imageBytes?.let { imageBytes->
-            val bitmap = imageBytes.toBitmap()
-
-            bitmap?.let { image ->
-                Image(
-                    bitmap = image.asImageBitmap(),
-                    contentDescription = "Sent image",
-                    modifier = Modifier
-                        .widthIn(max = 250.dp)
-                        .heightIn(max = 250.dp)
-                        .padding(top = 8.dp)
-                )
+        data.imageBytes?.let { imageBytes ->
+            imageBytes.toBitmap()?.let { image ->
+                Box(
+                    contentAlignment = Alignment.TopEnd,
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    SubcomposeAsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(image)
+                            .build(),
+                        contentDescription = "Sent image",
+                        loading = {
+                            Box(
+                                modifier = Modifier
+                                    .widthIn(max = 250.dp)
+                                    .heightIn(max = 250.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = color)
+                            }
+                        },
+                        modifier = Modifier
+                            .widthIn(max = 250.dp)
+                            .heightIn(max = 250.dp)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = if (isDataFromMySide) White else Gray80,
+                                shape = RoundedCornerShape(50)
+                            )
+                            .size(36.dp)
+                    ) {
+                        IconButton(
+                            onClick = {
+                                onAction(
+                                    UiAction.OnSaveImageClick {
+                                        saveMediaToStorage(
+                                            image,
+                                            context
+                                        )
+                                    }
+                                )
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = "Download image",
+                                tint = color,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
-}
-
-@Preview
-@Composable
-fun ChatMessagePreview() {
-    ChatMessage(
-        data = BluetoothData(
-            message = "Hello World!",
-            sender = "Pixel 6",
-            isFromMySide = false
-        )
-    )
 }

@@ -13,13 +13,18 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.activity.result.ActivityResultLauncher
+import com.example.tranzfera.data.bluetooth.model.BluetoothData
+import com.example.tranzfera.data.bluetooth.model.DataType
+import com.example.tranzfera.data.bluetooth.model.FoundBluetoothDevice
+import com.example.tranzfera.data.bluetooth.model.toByteArray
+import com.example.tranzfera.data.bluetooth.model.toFoundBluetoothDevice
 import com.example.tranzfera.util.HelperFunctions.parcelable
 import com.example.tranzfera.util.HelperFunctions.requestPermissions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emitAll
@@ -37,29 +42,26 @@ class BluetoothHandler(
     permissionLauncher: ActivityResultLauncher<Array<String>>
 ) {
     private val _scannedDevices = MutableStateFlow<List<FoundBluetoothDevice>>(listOf())
-    val scannedDevices: StateFlow<List<FoundBluetoothDevice>>
-        get() = _scannedDevices.asStateFlow()
+    val scannedDevices = _scannedDevices.asStateFlow()
 
     private val _pairedDevices = MutableStateFlow<List<FoundBluetoothDevice>>(listOf())
-    val pairedDevices: StateFlow<List<FoundBluetoothDevice>>
-        get() = _pairedDevices.asStateFlow()
+    val pairedDevices = _pairedDevices.asStateFlow()
 
     private val _connectedDevice = MutableStateFlow<FoundBluetoothDevice?>(null)
-    val connectedDevice: StateFlow<FoundBluetoothDevice?>
-        get() = _connectedDevice.asStateFlow()
+    val connectedDevice = _connectedDevice.asStateFlow()
 
     private var _isBluetoothEnabled = MutableStateFlow(false)
-    val isBluetoothEnabled: StateFlow<Boolean>
-        get() = _isBluetoothEnabled.asStateFlow()
+    val isBluetoothEnabled = _isBluetoothEnabled.asStateFlow()
+
+    private var isPairing: Boolean = false
 
     private var serverSocket: BluetoothServerSocket? = null
     private var clientSocket: BluetoothSocket? = null
 
     private var dataTransferService: BluetoothDataTransferService? = null
 
-    private val bluetoothManager: BluetoothManager = context
-        .getSystemService(BluetoothManager::class.java)
-    private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
+    private val bluetoothManager = context.getSystemService(BluetoothManager::class.java)
+    private val bluetoothAdapter = bluetoothManager.adapter
     private val bluetoothReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, getIntent: Intent?) {
             getIntent?.let { intent ->
@@ -89,19 +91,47 @@ class BluetoothHandler(
                             val newDevice = it.toFoundBluetoothDevice()
 
                             _scannedDevices.update { existingDevices ->
-                                if (newDevice in existingDevices) existingDevices else existingDevices + newDevice
+                                if (newDevice in existingDevices) existingDevices
+                                else existingDevices + newDevice
                             }
                         }
                     }
 
+                    BluetoothDevice.ACTION_BOND_STATE_CHANGED -> {
+                        val bondState = intent.getIntExtra(
+                            BluetoothDevice.EXTRA_BOND_STATE,
+                            BluetoothDevice.BOND_NONE
+                        )
+
+                        when (bondState) {
+                            BluetoothDevice.BOND_BONDED -> {
+                                isPairing = false
+                                updatePairedDevices()
+                            }
+
+                            BluetoothDevice.BOND_BONDING -> {
+                                isPairing = true
+                            }
+
+                            BluetoothDevice.BOND_NONE -> {
+                                isPairing = false
+                            }
+
+                            else -> {}
+                        }
+                    }
+
                     BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                        val foundDevice: BluetoothDevice? =
-                            intent.parcelable(BluetoothDevice.EXTRA_DEVICE)
+                        if (!isPairing) {
+                            val foundDevice: BluetoothDevice? =
+                                intent.parcelable(BluetoothDevice.EXTRA_DEVICE)
 
-                        foundDevice?.let {
-                            val newConnectedDevice = it.toFoundBluetoothDevice()
-
-                            _connectedDevice.update { newConnectedDevice }
+                            foundDevice?.let {
+                                val newConnectedDevice = it.toFoundBluetoothDevice()
+                                _connectedDevice.update { newConnectedDevice }
+                            }
+                        } else {
+                            isPairing = false
                         }
                     }
 
@@ -181,13 +211,12 @@ class BluetoothHandler(
     }
 
     fun pairDevice(device: FoundBluetoothDevice) {
+        isPairing = true
         val bluetoothDevice = bluetoothAdapter?.getRemoteDevice(device.address)
         bluetoothDevice?.createBond()
-
-        updatePairedDevices()
     }
 
-    private fun updatePairedDevices() {
+    fun updatePairedDevices() {
         bluetoothAdapter
             ?.bondedDevices
             ?.map { it.toFoundBluetoothDevice() }
@@ -200,7 +229,10 @@ class BluetoothHandler(
         return context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
     }
 
-    suspend fun tryToSendData(data: BluetoothData, dataType: DataType): BluetoothData? {
+    suspend fun tryToSendData(
+        data: BluetoothData,
+        dataType: DataType
+    ): BluetoothData? {
 
         if (dataTransferService == null) {
             return null
@@ -232,7 +264,10 @@ class BluetoothHandler(
         return bluetoothData
     }
 
-    fun connectToDevice(device: FoundBluetoothDevice): Flow<BluetoothState> {
+    @SuppressLint("DiscouragedPrivateApi")
+    fun connectToDevice(
+        device: FoundBluetoothDevice
+    ): Flow<BluetoothState> {
         return flow {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (!hasPermission(Manifest.permission.BLUETOOTH_CONNECT)) {
@@ -241,8 +276,9 @@ class BluetoothHandler(
             }
 
             val remoteDevice = bluetoothAdapter?.getRemoteDevice(device.address)
-            clientSocket =
-                remoteDevice?.createRfcommSocketToServiceRecord(UUID.fromString(UNIQUE_UUID))
+            clientSocket = remoteDevice?.createRfcommSocketToServiceRecord(
+                UUID.fromString(UNIQUE_UUID)
+            )
 
             if (clientSocket == null) {
                 emit(BluetoothState.BluetoothConnectionError("Client socket initialization failed"))
@@ -254,6 +290,15 @@ class BluetoothHandler(
             }
 
             try {
+                val socketField = clientSocket
+                    ?.javaClass
+                    ?.getDeclaredField("mSocket")
+                    ?.apply {
+                        isAccessible = true
+                    }
+                val socket = socketField?.get(clientSocket) as? java.net.Socket
+                socket?.soTimeout = 100000
+
                 clientSocket?.connect()
                 emit(BluetoothState.BluetoothConnectionSuccess)
 
@@ -267,13 +312,10 @@ class BluetoothHandler(
                 )
 
             } catch (e: IOException) {
-                try {
-                    clientSocket?.close()
-                } catch (closeException: IOException) {
-                    // Ignore exception during socket close
-                }
-                clientSocket = null
-                emit(BluetoothState.BluetoothConnectionError("Connection is not successful, try again!"))
+                cancelClientSocket()
+                emit(
+                    BluetoothState.BluetoothConnectionError("Connection is not successful, try again!")
+                )
             }
         }.flowOn(Dispatchers.IO).catch { e ->
             emit(BluetoothState.BluetoothConnectionError(e.message ?: "Unknown error"))
@@ -294,7 +336,9 @@ class BluetoothHandler(
             )
 
             if (serverSocket == null) {
-                emit(BluetoothState.BluetoothConnectionError("Server socket initialization failed"))
+                emit(
+                    BluetoothState.BluetoothConnectionError("Server socket initialization failed")
+                )
                 return@flow
             }
 
@@ -320,22 +364,33 @@ class BluetoothHandler(
                     )
                 }
             }
-        }.flowOn(Dispatchers.IO).catch { e ->
-            emit(BluetoothState.BluetoothConnectionError(e.message ?: "Unknown error"))
-        }
+        }.flowOn(Dispatchers.IO)
+            .catch { e ->
+                emit(BluetoothState.BluetoothConnectionError(e.message ?: "Unknown error"))
+            }
     }
 
     private fun cancelServerSocket() {
-        serverSocket?.close()
-        serverSocket = null
+        try {
+            serverSocket?.close()
+        } catch (e: IOException) {
+            Log.e("BluetoothConnection", "Error closing server socket: ${e.localizedMessage}", e)
+        } finally {
+            serverSocket = null
+        }
     }
 
-    private fun cancelClientSocket() {
-        clientSocket?.close()
-        clientSocket = null
+    fun cancelClientSocket() {
+        try {
+            clientSocket?.close()
+        } catch (e: IOException) {
+            Log.e("BluetoothConnection", "Error closing client socket: ${e.localizedMessage}", e)
+        } finally {
+            clientSocket = null
+        }
     }
 
-    fun cancelBluetoothConnection() {
+    private fun cancelBluetoothConnection() {
         cancelServerSocket()
         cancelClientSocket()
     }

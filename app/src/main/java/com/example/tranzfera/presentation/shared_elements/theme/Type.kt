@@ -1,4 +1,4 @@
-package com.example.tranzfera.ui.theme
+package com.example.tranzfera.presentation.shared_elements.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

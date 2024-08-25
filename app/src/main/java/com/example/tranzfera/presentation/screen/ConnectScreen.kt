@@ -3,19 +3,24 @@ package com.example.tranzfera.presentation.screen
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,21 +30,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Color.Companion.Green
 import androidx.compose.ui.graphics.Color.Companion.Red
 import androidx.compose.ui.graphics.Color.Companion.White
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.tranzfera.OnAction
 import com.example.tranzfera.R
-import com.example.tranzfera.data.bluetooth.FoundBluetoothDevice
+import com.example.tranzfera.data.bluetooth.model.FoundBluetoothDevice
 import com.example.tranzfera.presentation.event.UiAction
 import com.example.tranzfera.presentation.state.ConnectState
-import com.example.tranzfera.ui.composable.BlurredBackground
-import com.example.tranzfera.ui.composable.TranzferaButton
+import com.example.tranzfera.presentation.shared_elements.composable.BlurredBackground
+import com.example.tranzfera.presentation.shared_elements.composable.TranzferaButton
 
 @Composable
 fun ConnectScreen(
@@ -120,12 +127,16 @@ fun ScreenViewWithTurnedBluetoothON(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        ConnectedDevice(connectedDevice)
+        ConnectedDevice(connectedDevice, onAction)
         Spacer(modifier = Modifier.height(5.dp))
         TranzferaButton(
             onButtonClick = {
-                if (buttonText == "Scan") onAction(UiAction.OnButtonScanClick { buttonText = it })
-                else onAction(UiAction.OnButtonStopScanClick { buttonText = it })
+                if (buttonText == "Scan") onAction(
+                    UiAction.OnButtonScanClick { buttonText = it }
+                )
+                else onAction(
+                    UiAction.OnButtonStopScanClick { buttonText = it }
+                )
             },
             text = buttonText
         )
@@ -151,7 +162,8 @@ fun ScreenViewWithTurnedBluetoothON(
 
 @Composable
 fun ConnectedDevice(
-    connectedDevice: FoundBluetoothDevice?
+    connectedDevice: FoundBluetoothDevice?,
+    onAction: OnAction
 ) {
     Text(
         text = "Connected device:",
@@ -159,17 +171,45 @@ fun ConnectedDevice(
         fontWeight = FontWeight.Bold,
         color = White
     )
-    if (connectedDevice == null) {
-        Text(
-            text = "There is no connected device at the moment!",
-            color = Red
-        )
-    } else {
-        Text(
-            text = connectedDevice.name + "\n" + connectedDevice.address,
-            color = Green
-        )
-    }
+    connectedDevice?.let {
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = it.name + "\n" + it.address,
+                    color = Green,
+                    textDecoration = TextDecoration.Underline
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Box(
+                    contentAlignment = Alignment.TopEnd,
+                    modifier = Modifier
+                        .align(Alignment.Top)
+                ) {
+                    IconButton(
+                        onClick = {
+                            onAction(UiAction.OnDisconnectIconClick)
+                        },
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Disconnect",
+                            tint = Color.Gray
+                        )
+                    }
+                }
+            }
+        }
+    } ?: Text(
+        text = "There is no connected device at the moment!",
+        color = Red
+    )
 }
 
 @Composable
@@ -195,6 +235,7 @@ fun PairedDevicesList(
                 color = White,
                 modifier = Modifier
                     .clickable {
+                        onAction(UiAction.OnDropPairedDevicesClick)
                         shouldShowPairedDevices = !shouldShowPairedDevices
                     }
             )
@@ -217,7 +258,11 @@ fun PairedDevicesList(
                             text = device.name + "\n" + device.address,
                             color = White,
                             modifier = Modifier
-                                .clickable { onAction(UiAction.OnPairedDeviceClick(device)) }
+                                .clickable {
+                                    onAction(
+                                        UiAction.OnPairedDeviceClick(device)
+                                    )
+                                }
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                     }
@@ -272,7 +317,11 @@ fun ScannedDevicesList(
                             text = device.name + "\n" + device.address,
                             color = White,
                             modifier = Modifier
-                                .clickable { onAction(UiAction.OnScannedDeviceClick(device)) }
+                                .clickable {
+                                    onAction(
+                                        UiAction.OnScannedDeviceClick(device)
+                                    )
+                                }
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                     }

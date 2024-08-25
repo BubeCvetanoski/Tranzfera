@@ -2,6 +2,9 @@ package com.example.tranzfera.data.bluetooth
 
 import android.bluetooth.BluetoothSocket
 import android.util.Log
+import com.example.tranzfera.data.bluetooth.model.BluetoothData
+import com.example.tranzfera.data.bluetooth.model.DataType
+import com.example.tranzfera.data.bluetooth.model.toBluetoothData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -13,7 +16,6 @@ import java.nio.ByteBuffer
 class BluetoothDataTransferService(
     private val socket: BluetoothSocket
 ) {
-
     fun listenForIncomingData(): Flow<BluetoothData> {
         return flow {
             if (!socket.isConnected) {
@@ -29,8 +31,8 @@ class BluetoothDataTransferService(
                     if (dataType == DataType.ImageType.value) {
                         val sizeBuffer = ByteArray(4)
                         socket.inputStream.readFully(sizeBuffer)
-                        val imageSize = ByteBuffer.wrap(sizeBuffer).int
 
+                        val imageSize = ByteBuffer.wrap(sizeBuffer).int
                         val imageBuffer = ByteArray(imageSize)
                         var totalBytesRead = 0
 
@@ -72,9 +74,6 @@ class BluetoothDataTransferService(
                 val imageBuffer = ByteBuffer.allocate(4).putInt(dataSize).array()
                 socket.outputStream.write(byteArrayOf(dataType.value) + imageBuffer + data)
                 socket.outputStream.flush()
-                Log.i("BluetoothDataTransfer", "Sending image data size: ${data.size}")
-                Log.i("BluetoothDataTransfer", "Received image data size: ${imageBuffer.size}")
-
             } catch (e: IOException) {
                 e.printStackTrace()
                 return@withContext false

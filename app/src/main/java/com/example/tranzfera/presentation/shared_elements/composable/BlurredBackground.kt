@@ -1,4 +1,4 @@
-package com.example.tranzfera.ui.composable
+package com.example.tranzfera.presentation.shared_elements.composable
 
 import android.content.Context
 import android.graphics.Bitmap

@@ -1,6 +1,6 @@
 package com.example.tranzfera.presentation.state
 
-import com.example.tranzfera.data.bluetooth.FoundBluetoothDevice
+import com.example.tranzfera.data.bluetooth.model.FoundBluetoothDevice
 
 data class ConnectState(
     val isBluetoothEnabled: Boolean = false,

@@ -1,4 +1,4 @@
-package com.example.tranzfera.data.bluetooth
+package com.example.tranzfera.data.bluetooth.model
 
 data class BluetoothData(
     val message: String? = "",
@@ -44,9 +44,22 @@ fun String.toBluetoothData(isFromMySide: Boolean): BluetoothData {
 }
 
 fun ByteArray.toBluetoothData(isFromMySide: Boolean): BluetoothData {
+    val separatorIndex = indexOf('#'.code.toByte())
+
+    val sender = if (separatorIndex != -1) {
+        copyOfRange(0, separatorIndex).decodeToString()
+    } else {
+        null
+    }
+    val imageBytes = if (separatorIndex != -1) {
+        copyOfRange(separatorIndex + 1, size)
+    } else {
+        this
+    }
+
     return BluetoothData(
-        imageBytes = this,
-//        sender = sender, TODO
+        imageBytes = imageBytes,
+        sender = sender,
         isFromMySide = isFromMySide
     )
 }
@@ -58,7 +71,9 @@ fun BluetoothData.toByteArray(dataType: DataType): ByteArray {
         }
 
         DataType.ImageType -> {
-            imageBytes ?: byteArrayOf()
+            val senderBytes = sender?.encodeToByteArray() ?: byteArrayOf()
+            val separator = "#".encodeToByteArray()
+            senderBytes + separator + (imageBytes ?: byteArrayOf())
         }
     }
 }

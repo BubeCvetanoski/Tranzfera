@@ -10,8 +10,13 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
@@ -23,6 +28,7 @@ import com.example.tranzfera.presentation.navigation.Screens
 import com.example.tranzfera.presentation.navigation.composable.TranzferaNavigationBar
 import com.example.tranzfera.presentation.screen.ConnectScreen
 import com.example.tranzfera.presentation.screen.TransferScreen
+import kotlinx.coroutines.launch
 
 typealias OnAction = (UiAction) -> Unit
 
@@ -55,6 +61,8 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val navController = rememberNavController()
+            val coroutineScope = rememberCoroutineScope()
+            val snackbarHostState = remember { SnackbarHostState() }
             val connectState by viewModel.connectState.collectAsStateWithLifecycle()
             val transferState by viewModel.transferState.collectAsStateWithLifecycle()
 
@@ -69,9 +77,23 @@ class MainActivity : ComponentActivity() {
             Scaffold(
                 modifier = Modifier
                     .fillMaxSize(),
+                snackbarHost = {
+                    SnackbarHost(
+                        hostState = snackbarHostState
+                    )
+                },
                 bottomBar = {
                     TranzferaNavigationBar(
-                        navController = navController
+                        navController = navController,
+                        isConnectedDevice = connectState.isConnectedDevice,
+                        showSnackbarListener = { message ->
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar(
+                                    message = message,
+                                    duration = SnackbarDuration.Short
+                                )
+                            }
+                        }
                     )
                 }
             ) { paddingValues ->
